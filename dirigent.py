@@ -1,4 +1,4 @@
-# orchester - multi media player director
+# Dirigent - multi media player director
 
 ### TODO
 # establich connection to playerctl
@@ -26,7 +26,7 @@ import subprocess
 
 
 
-print("Orchester v" + VERSION + " starting up ...")
+print("Dirigent v" + VERSION + " starting up ...")
 
 
 print("Looking for playerctl ...")
@@ -60,4 +60,4 @@ if(STARTUP):
 
 
 
-print("Orchester v" + VERSION + " has shut down!")
+print("Dirigent v" + VERSION + " has shut down!")
