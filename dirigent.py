@@ -22,12 +22,14 @@ STARTUP = True
 
 import distutils.spawn
 import subprocess
+import argparse
 
 
-
-
+parser = argparse.ArgumentParser(description='Dirigent - a media player orchestration tool. Reads a yaml file to understand what they need to do.')
+parser.add_argument('yamlFile')
+args = parser.parse_args()
 print("Dirigent v" + VERSION + " starting up ...")
-
+print("Checking File " + args.yamlFile + " ...")
 
 print("Looking for playerctl ...")
 PLAYERCTL = distutils.spawn.find_executable("playerctl")
