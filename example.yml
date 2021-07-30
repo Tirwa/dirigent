@@ -21,7 +21,7 @@ playlist:
     stream: mopidy    
  
  - dinnerbreak:
-    start: '18:00'
+    start: '17:29'
     stream: mopidy
     file: background_nosound.mp4
     

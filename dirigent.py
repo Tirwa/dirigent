@@ -22,7 +22,7 @@ VLC = ""
 MOPIDY = ""
 STARTUP = True
 SLEEPTIME = 2
-MAXTICK = 5
+MAXTICK = 10000
 
 parser = argparse.ArgumentParser(description='Dirigent - a media player orchestration tool. Reads a yaml file to understand what they need to do.')
 parser.add_argument('yamlFile')
@@ -82,21 +82,28 @@ if(STARTUP):
 if(STARTUP):
     #print(playlist)
     print("Found the following media slots ...")
+    timeslots = {}
     for slot in playlist:
         #print(slot.values[0])
         slotTitle = list(slot)[0]
         slotAttributes = list(slot.values())[0]
         try:
             print(slotTitle + " @ " + slotAttributes['start'])
+            timeslots[slotAttributes['start']] = slotTitle
         except KeyError:
             pass
     currentTick = 0
     while (currentTick < MAXTICK):
-        sleep(SLEEPTIME)
         timeNow = localtime()
-        print(str(timeNow.tm_hour) + ":" + str(timeNow.tm_min))
+        currentTimeString = str(timeNow.tm_hour) + ":" + str(timeNow.tm_min)
+        try:
+            startMedia = timeslots[currentTimeString]
+            print(startMedia)
+        except KeyError:
+            print("Nothing to start!")        
+        #print(currentTimeString)
         currentTick = currentTick + 1
-
+        sleep(SLEEPTIME)
 
 
 print("Dirigent v" + VERSION + " has shut down!")
