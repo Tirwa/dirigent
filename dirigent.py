@@ -6,6 +6,7 @@
 # parse yaml file - DONE
 # learn about time
 # idea: every two seconds (sleep 2), check if something should be playing, and then if it is.
+# idea: create yaml verification via flag, set a bool to just try and read the yaml file and print the media slots
 # create routines for common start/stop/play scenarios
 
 import distutils.spawn
@@ -79,9 +80,16 @@ if(STARTUP):
        
 ## main loop       
 if(STARTUP):
-    print(playlist)
-    for slot in enumerate(playlist):
-        print(slot)
+    #print(playlist)
+    print("Found the following media slots ...")
+    for slot in playlist:
+        #print(slot.values[0])
+        slotTitle = list(slot)[0]
+        slotAttributes = list(slot.values())[0]
+        try:
+            print(slotTitle + " @ " + slotAttributes['start'])
+        except KeyError:
+            pass
     currentTick = 0
     while (currentTick < MAXTICK):
         sleep(SLEEPTIME)
