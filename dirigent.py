@@ -23,14 +23,27 @@ STARTUP = True
 import distutils.spawn
 import subprocess
 import argparse
+import os.path
 
 
 parser = argparse.ArgumentParser(description='Dirigent - a media player orchestration tool. Reads a yaml file to understand what they need to do.')
 parser.add_argument('yamlFile')
 args = parser.parse_args()
-print("Dirigent v" + VERSION + " starting up ...")
-print("Checking File " + args.yamlFile + " ...")
 
+print("Dirigent v" + VERSION + " starting up ...")
+
+print("Checking File " + args.yamlFile + " ...")
+if (args.yamlFile[-3:] == "yml"):
+    try:
+        yamlFile = open(args.yamlFile)
+        print("YAML File found!")
+    except IOError:
+        print("Error: Couldn't open the YAML file!")
+        STARTUP = False
+else:
+    print("This does not look like a YAML file!")
+    STARTUP = False    
+    
 print("Looking for playerctl ...")
 PLAYERCTL = distutils.spawn.find_executable("playerctl")
 if (PLAYERCTL):
