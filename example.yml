@@ -2,35 +2,35 @@
 playlist:
  - intro:
     file: intro.avi
-    start: 12:00
+    start: '12:00'
  - concertsabaton:
     file: sabaton.mp4
-    start: 12:05
+    start: '12:05'
     switchover: true
  - filler:
     stream: mopidy
     
  - intro:
     file: coldbeer.mp4
-    start: 13:59
+    start: '13:59'
  - concertairbourne:
     file: airbourne.mp4
-    start: 14:00
+    start: '14:00'
     switchover: true    
  - filler:
     stream: mopidy    
  
  - dinnerbreak:
-    start: 18:00
+    start: '18:00'
     stream: mopidy
     file: background_nosound.mp4
     
  - intro:
     file: coldbeer.mp4
-    start: 19:59
+    start: '19:59'
  - concertpowerwolf:
     file: powerwolf.mp4
-    start: 20:00
+    start: '20:00'
     switchover: true    
  - filler:
     stream: mopidy     

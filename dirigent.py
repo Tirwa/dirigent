@@ -5,6 +5,7 @@
 # get list of players - DONE
 # parse yaml file - DONE
 # learn about time
+# idea: every two seconds (sleep 2), check if something should be playing, and then if it is.
 # create routines for common start/stop/play scenarios
 
 import distutils.spawn
@@ -12,12 +13,15 @@ import subprocess
 import argparse
 import os.path
 import yaml
+from time import sleep, localtime
 
 VERSION = "0.0.3"
 PLAYERCTL = ""
 VLC = ""
 MOPIDY = ""
 STARTUP = True
+SLEEPTIME = 2
+MAXTICK = 5
 
 parser = argparse.ArgumentParser(description='Dirigent - a media player orchestration tool. Reads a yaml file to understand what they need to do.')
 parser.add_argument('yamlFile')
@@ -35,7 +39,7 @@ if(STARTUP):
             loadedYaml = yaml.safe_load(yamlFile)
             #print(loadedYaml)
             try:
-                playlist = loadedYaml['playlist']
+                playlist = list(loadedYaml['playlist'])
                 #print(playlist)                
             except (AttributeError, KeyError) as e:
                 print("Error: No Playlist found in file!")
@@ -72,12 +76,18 @@ if(STARTUP):
     else:
         print ("Error: Unable to locate vlc!")
         STARTUP = False
-        
+       
+## main loop       
 if(STARTUP):
-    print("Main Loop :)")
-    #print(playlist)
-    for slot in playlist:
+    print(playlist)
+    for slot in enumerate(playlist):
         print(slot)
+    currentTick = 0
+    while (currentTick < MAXTICK):
+        sleep(SLEEPTIME)
+        timeNow = localtime()
+        print(str(timeNow.tm_hour) + ":" + str(timeNow.tm_min))
+        currentTick = currentTick + 1
 
 
 
