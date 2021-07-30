@@ -3,7 +3,8 @@
 ### TODO
 # establich connection to playerctl - DONE
 # get list of players - DONE
-# parse yaml file 
+# parse yaml file - DONE
+# learn about time
 # create routines for common start/stop/play scenarios
 
 import distutils.spawn
@@ -31,7 +32,14 @@ if(STARTUP):
         try:
             yamlFile = open(args.yamlFile)
             print("YAML File found!")
-            print(yaml.safe_load(yamlFile))
+            loadedYaml = yaml.safe_load(yamlFile)
+            #print(loadedYaml)
+            try:
+                playlist = loadedYaml['playlist']
+                #print(playlist)                
+            except (AttributeError, KeyError) as e:
+                print("Error: No Playlist found in file!")
+                STARTUP = False
         except IOError:
             print("Error: Couldn't open the YAML file!")
             STARTUP = False
@@ -55,13 +63,21 @@ if(STARTUP):
         print ("Error: Unable to locate playerctl!")
         STARTUP = False
 
-
-
-
-
+## checking for vlc
+if(STARTUP):
+    print("Looking for vlc ...")
+    VLC = distutils.spawn.find_executable("vlc")    
+    if (VLC):
+        print ("vlc found at " + VLC)    
+    else:
+        print ("Error: Unable to locate vlc!")
+        STARTUP = False
+        
 if(STARTUP):
     print("Main Loop :)")
-
+    #print(playlist)
+    for slot in playlist:
+        print(slot)
 
 
 
