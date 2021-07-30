@@ -1,30 +1,22 @@
 # Dirigent - multi media player director
 
 ### TODO
-# establich connection to playerctl
-# get list of players
-# parse yaml files
+# establich connection to playerctl - DONE
+# get list of players - DONE
+# parse yaml file 
 # create routines for common start/stop/play scenarios
-
-VERSION = "0.0.2"
-PLAYERCTL = ""
-VLC = ""
-MOPIDY = ""
-STARTUP = True
-
-
-
-
-
-
-
-
 
 import distutils.spawn
 import subprocess
 import argparse
 import os.path
+import yaml
 
+VERSION = "0.0.3"
+PLAYERCTL = ""
+VLC = ""
+MOPIDY = ""
+STARTUP = True
 
 parser = argparse.ArgumentParser(description='Dirigent - a media player orchestration tool. Reads a yaml file to understand what they need to do.')
 parser.add_argument('yamlFile')
@@ -39,6 +31,7 @@ if(STARTUP):
         try:
             yamlFile = open(args.yamlFile)
             print("YAML File found!")
+            print(yaml.safe_load(yamlFile))
         except IOError:
             print("Error: Couldn't open the YAML file!")
             STARTUP = False
