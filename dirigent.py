@@ -4,10 +4,13 @@
 # establich connection to playerctl - DONE
 # get list of players - DONE
 # parse yaml file - DONE
-# learn about time
-# idea: every two seconds (sleep 2), check if something should be playing, and then if it is.
+# create routines for common start/stop/play scenarios - DONE
+# learn about time - DONE
+# idea: every two seconds (sleep 2), check if something should be playing - DONE for now, respects SLEEPTIME and MAXTICK
 # idea: create yaml verification via flag, set a bool to just try and read the yaml file and print the media slots
-# create routines for common start/stop/play scenarios
+# switchover: variable to be set if the player needs to be monitored
+#             if it is set, the main loop needs to continuously check that player
+#             as soon as it stops, the next item needs to be started
 
 import distutils.spawn
 import subprocess
@@ -16,13 +19,13 @@ import os.path
 import yaml
 from time import sleep, localtime
 
-VERSION = "0.0.3"
+VERSION = "0.0.5"
 PLAYERCTL = ""
 VLC = ""
 MOPIDY = ""
 STARTUP = True
 SLEEPTIME = 2
-MAXTICK = 10000
+MAXTICK = 1
 
 parser = argparse.ArgumentParser(description='Dirigent - a media player orchestration tool. Reads a yaml file to understand what they need to do.')
 parser.add_argument('yamlFile')
@@ -31,7 +34,9 @@ args = parser.parse_args()
 def playMedia(args):
     mediaFile = ''
     mediaStream = ''
-    print ("Trying to play " + str(args) + " ...")
+    print("Stopping Playback ...")
+    stopMedia()
+    print("Trying to play " + str(args) + " ...")
 
     try:    #look for a file in the arguments
         mediaFile = args['file']
@@ -41,16 +46,20 @@ def playMedia(args):
     
     try:    # look for a stream in the arguments
         mediaStream = args['stream'] 
-        print(mediaStream)
+        #print(mediaStream)
     except KeyError: 
         print("No Stream in directions!")
     
     if(mediaFile):
         print("Calling VLC now ...")
     if(mediaStream):
-        print("Calling mopidy now ...")
+        print("Calling " + mediaStream + " now ...")
         if(PLAYERCTL):
-            playerctlStartProcess = subprocess.run([PLAYERCTL, "play"], capture_output=True)
+            playerctlStartProcess = subprocess.run([PLAYERCTL, "-p", mediaStream, "play"], capture_output=True)
+
+def stopMedia():
+    if(PLAYERCTL):
+        playertctlStopProcess = subprocess.run([PLAYERCTL, "-a", "pause"])
 
 print("Dirigent v" + VERSION + " starting up ...")
 
