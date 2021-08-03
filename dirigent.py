@@ -5,6 +5,8 @@
 # get list of players - DONE
 # parse yaml file - DONE
 # learn about time
+# idea: every two seconds (sleep 2), check if something should be playing, and then if it is.
+# idea: create yaml verification via flag, set a bool to just try and read the yaml file and print the media slots
 # create routines for common start/stop/play scenarios
 
 import distutils.spawn
@@ -12,16 +14,43 @@ import subprocess
 import argparse
 import os.path
 import yaml
+from time import sleep, localtime
 
 VERSION = "0.0.3"
 PLAYERCTL = ""
 VLC = ""
 MOPIDY = ""
 STARTUP = True
+SLEEPTIME = 2
+MAXTICK = 10000
 
 parser = argparse.ArgumentParser(description='Dirigent - a media player orchestration tool. Reads a yaml file to understand what they need to do.')
 parser.add_argument('yamlFile')
 args = parser.parse_args()
+
+def playMedia(args):
+    mediaFile = ''
+    mediaStream = ''
+    print ("Trying to play " + str(args) + " ...")
+
+    try:    #look for a file in the arguments
+        mediaFile = args['file']
+        print(mediaFile)
+    except KeyError:
+        print("No File in directions!")
+    
+    try:    # look for a stream in the arguments
+        mediaStream = args['stream'] 
+        print(mediaStream)
+    except KeyError: 
+        print("No Stream in directions!")
+    
+    if(mediaFile):
+        print("Calling VLC now ...")
+    if(mediaStream):
+        print("Calling mopidy now ...")
+        if(PLAYERCTL):
+            playerctlStartProcess = subprocess.run([PLAYERCTL, "play"], capture_output=True)
 
 print("Dirigent v" + VERSION + " starting up ...")
 
@@ -35,7 +64,7 @@ if(STARTUP):
             loadedYaml = yaml.safe_load(yamlFile)
             #print(loadedYaml)
             try:
-                playlist = loadedYaml['playlist']
+                playlist = list(loadedYaml['playlist'])
                 #print(playlist)                
             except (AttributeError, KeyError) as e:
                 print("Error: No Playlist found in file!")
@@ -72,13 +101,35 @@ if(STARTUP):
     else:
         print ("Error: Unable to locate vlc!")
         STARTUP = False
-        
+       
+## main loop       
 if(STARTUP):
-    print("Main Loop :)")
     #print(playlist)
+    print("Found the following media slots ...")
+    timeslots = {}
     for slot in playlist:
-        print(slot)
-
+        #print(slot.values[0])
+        slotTitle = list(slot)[0]
+        slotAttributes = list(slot.values())[0]
+        try:
+            print(slotTitle + " @ " + slotAttributes['start'])
+            timeslots[slotAttributes['start']] = slotTitle
+        except KeyError:
+            pass
+    currentTick = 0
+    while (currentTick < MAXTICK):
+        timeNow = localtime()
+        currentTimeString = str(timeNow.tm_hour) + ":" + str(timeNow.tm_min)
+        try:
+            startMedia = timeslots[currentTimeString]
+            print(startMedia)
+            playMedia("")            
+        except KeyError:
+            print("Nothing to start!")    
+            playMedia(playlist[2]['filler']) # this is here just for debugging, remove later
+        #print(currentTimeString)
+        currentTick = currentTick + 1
+        sleep(SLEEPTIME)
 
 
 print("Dirigent v" + VERSION + " has shut down!")
