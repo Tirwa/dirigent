@@ -24,6 +24,7 @@ playlist:
     start: '17:29'
     stream: mopidy
     file: background_nosound.mp4
+    loopvideo: true
     
  - intro:
     file: coldbeer.mp4

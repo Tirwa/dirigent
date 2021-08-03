@@ -8,10 +8,10 @@
 # learn about time - DONE
 # idea: every two seconds (sleep 2), check if something should be playing - DONE for now, respects SLEEPTIME and MAXTICK
 # idea: create yaml verification via flag, set a bool to just try and read the yaml file and print the media slots
-# idea: create yaml structure to allow loop flag for vlc for combined video/stream playback
+# idea: create yaml structure (variable: loopvideo) to allow loop flag for vlc for combined video/stream playback
 # switchover: variable to be set if the player needs to be monitored
 #             if it is set, the main loop needs to continuously check that player
-#             as soon as it stops (playerctl status returns "Stopped"), the next item needs to be started
+#             as soon as it stops (playerctl status returns "Stopped"), the next item needs to be started - DONE, needs testing with vlc
 
 import distutils.spawn
 import subprocess
@@ -61,20 +61,32 @@ def playMedia(args):
         print("No Stream in directions!")
     
     if(mediaFile):
+        try:
+            setVlcLoop(args['loopvideo'])
+        except KeyError:
+            setVlcLoop(False)
         print("Calling VLC now ...")
     if(mediaStream):
         print("Calling " + mediaStream + " now ...")
         if(PLAYERCTL):
             playerctlStartProcess = subprocess.run([PLAYERCTL, "-p", mediaStream, "play"])
 
+def setVlcLoop(boolLoop):
+    if(PLAYERCTL):
+        if(boolLoop):
+            playerctlVlcLoopInstructions = [PLAYERCTL, "-p", "vlc", "loop", "Track"]
+        else:
+            playerctlVlcLoopInstructions = [PLAYERCTL, "-p", "vlc", "loop", "None"]
+        playerctlVlcLoopProcess = subprocess.run(playerctlVlcLoopInstructions)
+        
 def stopMedia():
     if(PLAYERCTL):
         playertctlStopProcess = subprocess.run([PLAYERCTL, "-a", "pause"])
 
 def getVlcStatus():
     if(PLAYERCTL):
-        playerctlVlcCheckProgress = subprocess.run([PLAYERCTL, "-p", "mopidy", "status"], capture_output=True)  #temporarily targets mopidy to aid debugging
-        playerctlVlcStdout = playerctlVlcCheckProgress.stdout.decode('UTF-8')[:-1].split(',')
+        playerctlVlcCheckProcess = subprocess.run([PLAYERCTL, "-p", "mopidy", "status"], capture_output=True)  #temporarily targets mopidy to aid debugging
+        playerctlVlcStdout = playerctlVlcCheckProcess.stdout.decode('UTF-8')[:-1].split(',')
         return str(playerctlVlcStdout[0])
 
 print("Dirigent v" + VERSION + " starting up ...")
