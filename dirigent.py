@@ -28,6 +28,30 @@ parser = argparse.ArgumentParser(description='Dirigent - a media player orchestr
 parser.add_argument('yamlFile')
 args = parser.parse_args()
 
+def playMedia(args):
+    mediaFile = ''
+    mediaStream = ''
+    print ("Trying to play " + str(args) + " ...")
+
+    try:    #look for a file in the arguments
+        mediaFile = args['file']
+        print(mediaFile)
+    except KeyError:
+        print("No File in directions!")
+    
+    try:    # look for a stream in the arguments
+        mediaStream = args['stream'] 
+        print(mediaStream)
+    except KeyError: 
+        print("No Stream in directions!")
+    
+    if(mediaFile):
+        print("Calling VLC now ...")
+    if(mediaStream):
+        print("Calling mopidy now ...")
+        if(PLAYERCTL):
+            playerctlStartProcess = subprocess.run([PLAYERCTL, "play"], capture_output=True)
+
 print("Dirigent v" + VERSION + " starting up ...")
 
 ## checking and opening yaml 
@@ -99,8 +123,10 @@ if(STARTUP):
         try:
             startMedia = timeslots[currentTimeString]
             print(startMedia)
+            playMedia("")            
         except KeyError:
-            print("Nothing to start!")        
+            print("Nothing to start!")    
+            playMedia(playlist[2]['filler']) # this is here just for debugging, remove later
         #print(currentTimeString)
         currentTick = currentTick + 1
         sleep(SLEEPTIME)
