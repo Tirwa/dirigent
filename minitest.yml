@@ -4,7 +4,7 @@ playlist:
     stream: mopidy
  - concerttest:
     file: concerts/test.mp4
-    start: '12:05'
+    start: '15:17'
     switchover: true
  - filler:
     stream: mopidy
