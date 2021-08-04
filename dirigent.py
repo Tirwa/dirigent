@@ -12,6 +12,7 @@
 # switchover: variable to be set if the player needs to be monitored
 #             if it is set, the main loop needs to continuously check that player
 #             as soon as it stops (playerctl status returns "Stopped"), the next item needs to be started - DONE, needs testing with vlc
+# fix: streams without a start time are currently only started via failover, so a stream at the beginning of file can not be played
 
 import distutils.spawn
 import subprocess
@@ -146,6 +147,7 @@ if(STARTUP):
     print("Found the following media slots ...")
     timeslots = {}
     for slot in playlist:
+        print(slot)
         slotTitle = list(slot)[0]
         slotAttributes = list(slot.values())[0]
         try:
@@ -164,14 +166,26 @@ if(STARTUP):
                 print("Switchover! Starting stream!")
                 playMedia({'stream': 'mopidy'})
             print("VLC Status for switchover: " + vlcStatus)
-            
-        try:
-            startMedia = timeslots[currentTimeString]
-            print(startMedia)
-            playMedia("")            
-        except KeyError:
-            print("Nothing to start!")    
-            playMedia(playlist[6]['dinnerbreak']) # this is here just for debugging, remove later   playMedia(playlist[2]['filler'])
+        else:    
+            try:
+                startMedia = timeslots[currentTimeString]
+                #print(startMedia)
+                playMedia("")            
+            except KeyError:
+                # check if the first entry in yaml is a stream without start?
+                firstEntry = list(playlist[0].values())[0]
+                try:
+                    if(firstEntry['stream'] == 'mopidy' and currentTick == 0):
+                        #print("First Entry is a stream!")
+                        try:
+                            testStartTime = firstEntry['start']
+                        except KeyError:
+                            #print(firstEntry)
+                            playMedia(firstEntry)
+                except KeyError:
+                    pass
+                print("Nothing to start!")    
+                #playMedia(playlist[6]['dinnerbreak']) # this is here just for debugging, remove later   playMedia(playlist[2]['filler'])
         #print(currentTimeString)
         currentTick = currentTick + 1
         sleep(SLEEPTIME)
