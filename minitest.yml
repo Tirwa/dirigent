@@ -1,0 +1,10 @@
+---
+playlist:
+ - intro:
+    stream: mopidy
+ - concerttest:
+    file: concerts/test.mp4
+    start: '12:05'
+    switchover: true
+ - filler:
+    stream: mopidy

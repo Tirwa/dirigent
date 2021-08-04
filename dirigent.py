@@ -61,11 +61,12 @@ def playMedia(args):
         print("No Stream in directions!")
     
     if(mediaFile):
+        print("Calling VLC here ...")
         try:
             setVlcLoop(args['loopvideo'])
         except KeyError:
             setVlcLoop(False)
-        print("Calling VLC now ...")
+
     if(mediaStream):
         print("Calling " + mediaStream + " now ...")
         if(PLAYERCTL):
