@@ -4,10 +4,16 @@
 # establich connection to playerctl - DONE
 # get list of players - DONE
 # parse yaml file - DONE
-# learn about time
-# idea: every two seconds (sleep 2), check if something should be playing, and then if it is.
+# create routines for common start/stop/play scenarios - DONE
+# learn about time - DONE
+# idea: every two seconds (sleep 2), check if something should be playing - DONE for now, respects SLEEPTIME and MAXTICK
 # idea: create yaml verification via flag, set a bool to just try and read the yaml file and print the media slots
-# create routines for common start/stop/play scenarios
+# idea: create yaml structure (variable: loopvideo) to allow loop flag for vlc for combined video/stream playback
+# switchover: variable to be set if the player needs to be monitored
+#             if it is set, the main loop needs to continuously check that player
+#             as soon as it stops (playerctl status returns "Stopped"), the next item needs to be started - DONE, tested
+# fix: streams without a start time are currently only started via failover, so a stream at the beginning of file can not be played - DONE
+# fix: time components (minute / hour) have leading zeroes omitted, causing some start times to be ignored
 
 import distutils.spawn
 import subprocess
@@ -16,23 +22,34 @@ import os.path
 import yaml
 from time import sleep, localtime
 
-VERSION = "0.0.3"
+VERSION = "0.0.6"
 PLAYERCTL = ""
 VLC = ""
 MOPIDY = ""
 STARTUP = True
 SLEEPTIME = 2
 MAXTICK = 10000
+SWITCHOVER = []
 
 parser = argparse.ArgumentParser(description='Dirigent - a media player orchestration tool. Reads a yaml file to understand what they need to do.')
 parser.add_argument('yamlFile')
 args = parser.parse_args()
 
 def playMedia(args):
+    global SWITCHOVER
     mediaFile = ''
     mediaStream = ''
-    print ("Trying to play " + str(args) + " ...")
-
+    print("Stopping Playback ...")
+    stopMedia()
+    print("Trying to play " + str(args) + " ...")
+    try:    #look for switchover
+        switchoverFlag = args['switchover']
+        if(switchoverFlag):
+            SWITCHOVER = ['vlc', True]
+        else:
+            SWITCHOVER = []
+    except KeyError:
+        SWITCHOVER = []
     try:    #look for a file in the arguments
         mediaFile = args['file']
         print(mediaFile)
@@ -41,16 +58,52 @@ def playMedia(args):
     
     try:    # look for a stream in the arguments
         mediaStream = args['stream'] 
-        print(mediaStream)
+        #print(mediaStream)
     except KeyError: 
         print("No Stream in directions!")
     
     if(mediaFile):
-        print("Calling VLC now ...")
+        playVlcFile(mediaFile)
+        try:
+            setVlcLoop(args['loopvideo'])
+        except KeyError:
+            setVlcLoop(False)
+
     if(mediaStream):
-        print("Calling mopidy now ...")
+        print("Calling " + mediaStream + " now ...")
         if(PLAYERCTL):
-            playerctlStartProcess = subprocess.run([PLAYERCTL, "play"], capture_output=True)
+            playerctlStartProcess = subprocess.run([PLAYERCTL, "-p", mediaStream, "play"])
+
+def setVlcLoop(boolLoop):
+    if(PLAYERCTL):
+        if(boolLoop):
+            playerctlVlcLoopInstructions = [PLAYERCTL, "-p", "vlc", "loop", "Track"]
+        else:
+            playerctlVlcLoopInstructions = [PLAYERCTL, "-p", "vlc", "loop", "None"]
+        playerctlVlcLoopProcess = subprocess.run(playerctlVlcLoopInstructions)
+        
+def stopMedia():
+    if(PLAYERCTL):
+        playertctlStopProcess = subprocess.run([PLAYERCTL, "-a", "pause"])
+
+def getVlcStatus():
+    if(PLAYERCTL):
+        playerctlVlcCheckProcess = subprocess.run([PLAYERCTL, "-p", "vlc", "status"], capture_output=True)  #temporarily targets mopidy to aid debugging
+        playerctlVlcStdout = playerctlVlcCheckProcess.stdout.decode('UTF-8')[:-1].split(',')
+        return str(playerctlVlcStdout[0])
+
+def getPlaylistIndex(slotName):
+    for slot in enumerate(playlist):
+        try:
+            testIndex = slot[1][slotName]
+            return slot[0]
+        except KeyError:
+            pass
+
+def playVlcFile(fileName):
+    if(PLAYERCTL):
+        playerctlVlcPlayInstructions = [PLAYERCTL, "-p", "vlc", "open", fileName]
+        playerctlVlcPlayProcess = subprocess.run(playerctlVlcPlayInstructions)
 
 print("Dirigent v" + VERSION + " starting up ...")
 
@@ -104,11 +157,11 @@ if(STARTUP):
        
 ## main loop       
 if(STARTUP):
-    #print(playlist)
+    #print("-- Main Loop --")
     print("Found the following media slots ...")
     timeslots = {}
     for slot in playlist:
-        #print(slot.values[0])
+        print(slot)
         slotTitle = list(slot)[0]
         slotAttributes = list(slot.values())[0]
         try:
@@ -118,15 +171,36 @@ if(STARTUP):
             pass
     currentTick = 0
     while (currentTick < MAXTICK):
+        print("-- Main Loop Tick --")   
         timeNow = localtime()
         currentTimeString = str(timeNow.tm_hour) + ":" + str(timeNow.tm_min)
-        try:
-            startMedia = timeslots[currentTimeString]
-            print(startMedia)
-            playMedia("")            
-        except KeyError:
-            print("Nothing to start!")    
-            playMedia(playlist[2]['filler']) # this is here just for debugging, remove later
+        if(len(SWITCHOVER)>0):
+            vlcStatus = getVlcStatus()
+            if(vlcStatus == "Stopped"):
+                print("Switchover! Starting stream!")
+                playMedia({'stream': 'mopidy'})
+            print("VLC Status for switchover: " + vlcStatus)
+        else:
+            try:
+                print("Trying for media ... " + "currentTimeString: " + currentTimeString)
+                startMedia = timeslots[currentTimeString]
+                slotToPlay = playlist[getPlaylistIndex(startMedia)]
+                print(str(slotToPlay[startMedia]))
+                playMedia(slotToPlay[startMedia])            
+            except KeyError:
+                # check if the first entry in yaml is a stream without start?
+                firstEntry = list(playlist[0].values())[0]
+                try:
+                    if(firstEntry['stream'] == 'mopidy' and currentTick == 0):
+                        print("First Entry is a stream!")
+                        try:
+                            testStartTime = firstEntry['start']
+                        except KeyError:
+                            playMedia(firstEntry)
+                except KeyError:
+                    pass
+                print("Nothing to start!")    
+                #playMedia(playlist[6]['dinnerbreak']) # this is here just for debugging, remove later   playMedia(playlist[2]['filler'])
         #print(currentTimeString)
         currentTick = currentTick + 1
         sleep(SLEEPTIME)
