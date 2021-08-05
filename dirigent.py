@@ -14,7 +14,7 @@
 #             as soon as it stops (playerctl status returns "Stopped"), the next item needs to be started - DONE, tested
 # fix: streams without a start time are currently only started via failover, so a stream at the beginning of file can not be played - DONE
 # fix: time components (minute / hour) have leading zeroes omitted, causing some start times to be ignored - DONE
-# idea: since playerctl won't play a file in vlc if it's not running, add a routine to check if it is running and if necessary, start it (maybe giving along options with branding overlay)
+# idea: since playerctl won't play a file in vlc if it's not running, add a routine to check if it is running and if necessary, start it (maybe giving along options with branding overlay) - DONE
 # cvlc --fullscreen --video-on-top --x11-display :0 <file> &
 # this keeps the vlc process running, even if it doesn't show anything after the file finishes - it still reports as "Stopped" for switchover, and opening another file via "playerctl open" works fine
 
@@ -112,7 +112,7 @@ def playVlcFile(fileName):
 def startVlcProcess():
     if(VLC):
         vlcStartInstructions = [VLC, "--fullscreen", "--video-on-top", "--x11-display", ":0"]
-        vlcStartProcess = subprocess.Popen(vlcStartInstructions)
+        vlcStartProcess = subprocess.Popen(vlcStartInstructions, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 print("Dirigent v" + VERSION + " starting up ...")
 
