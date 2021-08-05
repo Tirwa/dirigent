@@ -14,7 +14,9 @@
 #             as soon as it stops (playerctl status returns "Stopped"), the next item needs to be started - DONE, tested
 # fix: streams without a start time are currently only started via failover, so a stream at the beginning of file can not be played - DONE
 # fix: time components (minute / hour) have leading zeroes omitted, causing some start times to be ignored - DONE
-# idea: since playerctl won't play a file in vlc if it's not running, add a routine to check if it is running and if necessary, start it
+# idea: since playerctl won't play a file in vlc if it's not running, add a routine to check if it is running and if necessary, start it (maybe giving along options with branding overlay)
+# cvlc --fullscreen --video-on-top --x11-display :0 <file> &
+# this keeps the vlc process running, even if it doesn't show anything after the file finishes - it still reports as "Stopped" for switchover, and opening another file via "playerctl open" works fine
 
 import distutils.spawn
 import subprocess
@@ -31,6 +33,7 @@ STARTUP = True
 SLEEPTIME = 2
 MAXTICK = 10000
 SWITCHOVER = []
+LINEWIDTH = 72
 
 parser = argparse.ArgumentParser(description='Dirigent - a media player orchestration tool. Reads a yaml file to understand what they need to do.')
 parser.add_argument('yamlFile')
@@ -89,7 +92,7 @@ def stopMedia():
 
 def getVlcStatus():
     if(PLAYERCTL):
-        playerctlVlcCheckProcess = subprocess.run([PLAYERCTL, "-p", "vlc", "status"], capture_output=True)  #temporarily targets mopidy to aid debugging
+        playerctlVlcCheckProcess = subprocess.run([PLAYERCTL, "-p", "vlc", "status"], capture_output=True)
         playerctlVlcStdout = playerctlVlcCheckProcess.stdout.decode('UTF-8')[:-1].split(',')
         return str(playerctlVlcStdout[0])
 
@@ -105,6 +108,11 @@ def playVlcFile(fileName):
     if(PLAYERCTL):
         playerctlVlcPlayInstructions = [PLAYERCTL, "-p", "vlc", "open", fileName]
         playerctlVlcPlayProcess = subprocess.run(playerctlVlcPlayInstructions)
+
+def startVlcProcess():
+    if(VLC):
+        vlcStartInstructions = [VLC, "--fullscreen", "--video-on-top", "--x11-display", ":0"]
+        vlcStartProcess = subprocess.Popen(vlcStartInstructions)
 
 print("Dirigent v" + VERSION + " starting up ...")
 
@@ -129,8 +137,18 @@ if(STARTUP):
     else:
         print("This does not look like a YAML file!")
         STARTUP = False    
-    
-## checking for playerctl and trying to get a list of available players
+
+## checking for vlc
+if(STARTUP):
+    print("Looking for vlc ...")
+    VLC = distutils.spawn.find_executable("cvlc")    
+    if (VLC):
+        print ("vlc found at " + VLC)    
+    else:
+        print ("Error: Unable to locate vlc!")
+        STARTUP = False
+
+## checking for playerctl and making sure vlc is running
 if(STARTUP):
     print("Looking for playerctl ...")
     PLAYERCTL = distutils.spawn.find_executable("playerctl")
@@ -138,23 +156,17 @@ if(STARTUP):
         print ("playerctl found at " + PLAYERCTL)
         print("Getting List of all available media players ...")
         playerctlProcess = subprocess.run([PLAYERCTL, "--list-all"], capture_output=True)
-        playerctlStdout = playerctlProcess.stdout.decode('UTF-8')[:-1].split(',')
+        playerctlStdout = playerctlProcess.stdout.decode('UTF-8').splitlines()
         print(playerctlStdout)
-        if(playerctlStdout == ""):
-            pass
+        try:
+            vlcStarted = playerctlStdout.index('vlc')
+        except ValueError:
+            startVlcProcess()
     else:
         print ("Error: Unable to locate playerctl!")
         STARTUP = False
 
-## checking for vlc
-if(STARTUP):
-    print("Looking for vlc ...")
-    VLC = distutils.spawn.find_executable("vlc")    
-    if (VLC):
-        print ("vlc found at " + VLC)    
-    else:
-        print ("Error: Unable to locate vlc!")
-        STARTUP = False
+
        
 ## main loop       
 if(STARTUP):
