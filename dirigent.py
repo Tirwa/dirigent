@@ -44,9 +44,9 @@ def playMedia(args):
     global SWITCHOVER
     mediaFile = ''
     mediaStream = ''
-    print("Stopping Playback ...")
+    logMessage("Stopping Playback ...")
     stopMedia()
-    print("Trying to play " + str(args) + " ...")
+    logMessage("Trying to play " + str(args) + " ...")
     try:    #look for switchover
         switchoverFlag = args['switchover']
         if(switchoverFlag):
@@ -57,15 +57,14 @@ def playMedia(args):
         SWITCHOVER = []
     try:    #look for a file in the arguments
         mediaFile = args['file']
-        print(mediaFile)
+        logMessage(mediaFile)
     except KeyError:
-        print("No File in directions!")
+        logMessage("No File in directions!")
     
     try:    # look for a stream in the arguments
         mediaStream = args['stream'] 
-        #print(mediaStream)
     except KeyError: 
-        print("No Stream in directions!")
+        logMessage("No Stream in directions!")
     
     if(mediaFile):
         playVlcFile(mediaFile)
@@ -75,7 +74,7 @@ def playMedia(args):
             setVlcLoop(False)
 
     if(mediaStream):
-        print("Calling " + mediaStream + " now ...")
+        logMessage("Calling " + mediaStream + " now ...")
         if(PLAYERCTL):
             playerctlStartProcess = subprocess.run([PLAYERCTL, "-p", mediaStream, "play"])
 
@@ -184,7 +183,7 @@ if(STARTUP):
 ## main loop       
 if(STARTUP):
     #print("-- Main Loop --")
-    print("Found the following media slots ...")
+    logMessage("Found the following media slots ...")
     timeslots = {}
     for slot in playlist:
         print(slot)
@@ -197,15 +196,15 @@ if(STARTUP):
             pass
     currentTick = 0
     while (currentTick < MAXTICK):
-        print("-- Main Loop Tick --")   
+        logMessage("-- Main Loop Tick --")   
         timeNow = localtime()
         currentTimeString = str(timeNow.tm_hour).rjust(2, '0') + ":" + str(timeNow.tm_min).rjust(2, '0')
         if(len(SWITCHOVER)>0):
             vlcStatus = getVlcStatus()
             if(vlcStatus == "Stopped"):
-                print("Switchover! Starting stream!")
+                logMessage("Switchover! Starting stream!")
                 playMedia({'stream': 'mopidy'})
-            print("VLC Status for switchover: " + vlcStatus)
+            logMessage("VLC Status for switchover: " + vlcStatus)
         else:
             try:
                 print("Trying for media ... " + "currentTimeString: " + currentTimeString)
