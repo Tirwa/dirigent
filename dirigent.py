@@ -31,9 +31,10 @@ VLC = ""
 MOPIDY = ""
 STARTUP = True
 SLEEPTIME = 2
-MAXTICK = 10000
+MAXTICK = 25200 #14 hours of operation
 SWITCHOVER = []
 LINEWIDTH = 72
+MESSAGEBUFFER = ""
 
 parser = argparse.ArgumentParser(description='Dirigent - a media player orchestration tool. Reads a yaml file to understand what they need to do.')
 parser.add_argument('yamlFile')
@@ -113,57 +114,69 @@ def startVlcProcess():
     if(VLC):
         vlcStartInstructions = [VLC, "--fullscreen", "--video-on-top", "--x11-display", ":0"]
         vlcStartProcess = subprocess.Popen(vlcStartInstructions, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+def logMessage(message, followup=False):
+    global MESSAGEBUFFER
+    if(followup):
+        MESSAGEBUFFER = message
+    else:
+        if(MESSAGEBUFFER == ""):
+            print(message)
+        else:
+            lineToPrint = MESSAGEBUFFER + str(message).rjust((LINEWIDTH - len(MESSAGEBUFFER)), " ")
+            MESSAGEBUFFER = ""
+            print(lineToPrint)
 
 print("Dirigent v" + VERSION + " starting up ...")
 
 ## checking and opening yaml 
 if(STARTUP):
-    print("Checking File " + args.yamlFile + " ...")
+    logMessage("Checking File " + args.yamlFile + " ...", True)
     if (args.yamlFile[-3:] == "yml"):
         try:
             yamlFile = open(args.yamlFile)
-            print("YAML File found!")
+            logMessage("YAML File found!")
             loadedYaml = yaml.safe_load(yamlFile)
             #print(loadedYaml)
             try:
                 playlist = list(loadedYaml['playlist'])
                 #print(playlist)                
             except (AttributeError, KeyError) as e:
-                print("Error: No Playlist found in file!")
+                logMessage("Error: No Playlist found in file!")
                 STARTUP = False
         except IOError:
-            print("Error: Couldn't open the YAML file!")
+            logMessage("Error: Couldn't open the YAML file!")
             STARTUP = False
     else:
-        print("This does not look like a YAML file!")
+        logMessage("This does not look like a YAML file!")
         STARTUP = False    
 
 ## checking for vlc
 if(STARTUP):
-    print("Looking for vlc ...")
+    logMessage("Looking for vlc ...", True)
     VLC = distutils.spawn.find_executable("cvlc")    
     if (VLC):
-        print ("vlc found at " + VLC)    
+        logMessage ("vlc found at " + VLC)    
     else:
-        print ("Error: Unable to locate vlc!")
+        logMessage ("Error: Unable to locate vlc!")
         STARTUP = False
 
 ## checking for playerctl and making sure vlc is running
 if(STARTUP):
-    print("Looking for playerctl ...")
+    logMessage("Looking for playerctl ...", True)
     PLAYERCTL = distutils.spawn.find_executable("playerctl")
     if (PLAYERCTL):
-        print ("playerctl found at " + PLAYERCTL)
-        print("Getting List of all available media players ...")
+        logMessage ("playerctl found at " + PLAYERCTL)
+        logMessage("Getting List of all available media players ...", True)
         playerctlProcess = subprocess.run([PLAYERCTL, "--list-all"], capture_output=True)
         playerctlStdout = playerctlProcess.stdout.decode('UTF-8').splitlines()
-        print(playerctlStdout)
+        logMessage(playerctlStdout)
         try:
             vlcStarted = playerctlStdout.index('vlc')
         except ValueError:
             startVlcProcess()
     else:
-        print ("Error: Unable to locate playerctl!")
+        logMessage ("Error: Unable to locate playerctl!")
         STARTUP = False
 
 
