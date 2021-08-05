@@ -13,7 +13,8 @@
 #             if it is set, the main loop needs to continuously check that player
 #             as soon as it stops (playerctl status returns "Stopped"), the next item needs to be started - DONE, tested
 # fix: streams without a start time are currently only started via failover, so a stream at the beginning of file can not be played - DONE
-# fix: time components (minute / hour) have leading zeroes omitted, causing some start times to be ignored
+# fix: time components (minute / hour) have leading zeroes omitted, causing some start times to be ignored - DONE
+# idea: since playerctl won't play a file in vlc if it's not running, add a routine to check if it is running and if necessary, start it
 
 import distutils.spawn
 import subprocess
@@ -173,7 +174,7 @@ if(STARTUP):
     while (currentTick < MAXTICK):
         print("-- Main Loop Tick --")   
         timeNow = localtime()
-        currentTimeString = str(timeNow.tm_hour) + ":" + str(timeNow.tm_min)
+        currentTimeString = str(timeNow.tm_hour).rjust(2, '0') + ":" + str(timeNow.tm_min).rjust(2, '0')
         if(len(SWITCHOVER)>0):
             vlcStatus = getVlcStatus()
             if(vlcStatus == "Stopped"):
@@ -201,7 +202,6 @@ if(STARTUP):
                     pass
                 print("Nothing to start!")    
                 #playMedia(playlist[6]['dinnerbreak']) # this is here just for debugging, remove later   playMedia(playlist[2]['filler'])
-        #print(currentTimeString)
         currentTick = currentTick + 1
         sleep(SLEEPTIME)
 
