@@ -7,8 +7,8 @@
 # create routines for common start/stop/play scenarios - DONE
 # learn about time - DONE
 # idea: every two seconds (sleep 2), check if something should be playing - DONE for now, respects SLEEPTIME and MAXTICK
-# idea: create yaml verification via flag, set a bool to just try and read the yaml file and print the media slots
-# idea: create yaml structure (variable: loopvideo) to allow loop flag for vlc for combined video/stream playback
+# idea: create yaml verification via flag, set a bool to just try and read the yaml file and print the media slots - DONE
+# idea: create yaml structure (variable: loopvideo) to allow loop flag for vlc for combined video/stream playback - DONE
 # switchover: variable to be set if the player needs to be monitored
 #             if it is set, the main loop needs to continuously check that player
 #             as soon as it stops (playerctl status returns "Stopped"), the next item needs to be started - DONE, tested
@@ -25,7 +25,7 @@ import os.path
 import yaml
 from time import sleep, localtime
 
-VERSION = "0.0.6"
+VERSION = "0.0.7"
 PLAYERCTL = ""
 VLC = ""
 MOPIDY = ""
@@ -35,10 +35,13 @@ MAXTICK = 25200 #14 hours of operation
 SWITCHOVER = []
 LINEWIDTH = 72
 MESSAGEBUFFER = ""
+VERIFY = False
 
-parser = argparse.ArgumentParser(description='Dirigent - a media player orchestration tool. Reads a yaml file to understand what they need to do.')
+parser = argparse.ArgumentParser(description='Dirigent - a media player orchestration tool. Reads a yaml file to understand what to direct the media players to do.')
+parser.add_argument('-v', '--verify', help='Verify a YAML file', action='store_const', const=True)
 parser.add_argument('yamlFile')
 args = parser.parse_args()
+VERIFY = args.verify
 
 def playMedia(args):
     global SWITCHOVER
@@ -151,7 +154,7 @@ if(STARTUP):
         STARTUP = False    
 
 ## checking for vlc
-if(STARTUP):
+if(STARTUP and not VERIFY):
     logMessage("Looking for vlc ...", True)
     VLC = distutils.spawn.find_executable("cvlc")    
     if (VLC):
@@ -161,7 +164,7 @@ if(STARTUP):
         STARTUP = False
 
 ## checking for playerctl and making sure vlc is running
-if(STARTUP):
+if(STARTUP and not VERIFY):
     logMessage("Looking for playerctl ...", True)
     PLAYERCTL = distutils.spawn.find_executable("playerctl")
     if (PLAYERCTL):
@@ -190,44 +193,45 @@ if(STARTUP):
         slotTitle = list(slot)[0]
         slotAttributes = list(slot.values())[0]
         try:
-            print(slotTitle + " @ " + slotAttributes['start'])
+            #print(slotTitle + " @ " + slotAttributes['start'])
             timeslots[slotAttributes['start']] = slotTitle
         except KeyError:
             pass
-    currentTick = 0
-    while (currentTick < MAXTICK):
-        logMessage("-- Main Loop Tick --")   
-        timeNow = localtime()
-        currentTimeString = str(timeNow.tm_hour).rjust(2, '0') + ":" + str(timeNow.tm_min).rjust(2, '0')
-        if(len(SWITCHOVER)>0):
-            vlcStatus = getVlcStatus()
-            if(vlcStatus == "Stopped"):
-                logMessage("Switchover! Starting stream!")
-                playMedia({'stream': 'mopidy'})
-            logMessage("VLC Status for switchover: " + vlcStatus)
-        else:
-            try:
-                print("Trying for media ... " + "currentTimeString: " + currentTimeString)
-                startMedia = timeslots[currentTimeString]
-                slotToPlay = playlist[getPlaylistIndex(startMedia)]
-                print(str(slotToPlay[startMedia]))
-                playMedia(slotToPlay[startMedia])            
-            except KeyError:
-                # check if the first entry in yaml is a stream without start?
-                firstEntry = list(playlist[0].values())[0]
+    if(not VERIFY):
+        currentTick = 0
+        while (currentTick < MAXTICK):
+            logMessage("-- Main Loop Tick --")   
+            timeNow = localtime()
+            currentTimeString = str(timeNow.tm_hour).rjust(2, '0') + ":" + str(timeNow.tm_min).rjust(2, '0')
+            if(len(SWITCHOVER)>0):
+                vlcStatus = getVlcStatus()
+                if(vlcStatus == "Stopped"):
+                    logMessage("Switchover! Starting stream!")
+                    playMedia({'stream': 'mopidy'})
+                logMessage("VLC Status for switchover: " + vlcStatus)
+            else:
                 try:
-                    if(firstEntry['stream'] == 'mopidy' and currentTick == 0):
-                        print("First Entry is a stream!")
-                        try:
-                            testStartTime = firstEntry['start']
-                        except KeyError:
-                            playMedia(firstEntry)
+                    print("Trying for media ... " + "currentTimeString: " + currentTimeString)
+                    startMedia = timeslots[currentTimeString]
+                    slotToPlay = playlist[getPlaylistIndex(startMedia)]
+                    print(str(slotToPlay[startMedia]))
+                    playMedia(slotToPlay[startMedia])            
                 except KeyError:
-                    pass
-                print("Nothing to start!")    
-                #playMedia(playlist[6]['dinnerbreak']) # this is here just for debugging, remove later   playMedia(playlist[2]['filler'])
-        currentTick = currentTick + 1
-        sleep(SLEEPTIME)
+                    # check if the first entry in yaml is a stream without start?
+                    firstEntry = list(playlist[0].values())[0]
+                    try:
+                        if(firstEntry['stream'] == 'mopidy' and currentTick == 0):
+                            print("First Entry is a stream!")
+                            try:
+                                testStartTime = firstEntry['start']
+                            except KeyError:
+                                playMedia(firstEntry)
+                    except KeyError:
+                        pass
+                    print("Nothing to start!")    
+                    #playMedia(playlist[6]['dinnerbreak']) # this is here just for debugging, remove later   playMedia(playlist[2]['filler'])
+            currentTick = currentTick + 1
+            sleep(SLEEPTIME)
 
 
 print("Dirigent v" + VERSION + " has shut down!")
