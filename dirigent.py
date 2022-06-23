@@ -1,6 +1,7 @@
 # Dirigent - multi media player director
 
 ### TODO
+
 # establich connection to playerctl - DONE
 # get list of players - DONE
 # parse yaml file - DONE
@@ -14,6 +15,9 @@
 #             as soon as it stops (playerctl status returns "Stopped"), the next item needs to be started - DONE, tested
 # fix: streams without a start time are currently only started via failover, so a stream at the beginning of file can not be played - DONE
 # fix: time components (minute / hour) have leading zeroes omitted, causing some start times to be ignored
+# feature: when starting the main loop, try to establish if something should be already playing, and start that
+# test: absolute paths in filenames
+# bug: playlist item is started multiple times
 
 import distutils.spawn
 import subprocess
