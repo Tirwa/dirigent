@@ -14,10 +14,11 @@
 #             if it is set, the main loop needs to continuously check that player
 #             as soon as it stops (playerctl status returns "Stopped"), the next item needs to be started - DONE, tested
 # fix: streams without a start time are currently only started via failover, so a stream at the beginning of file can not be played - DONE
-# feature: when starting the main loop, try to establish if something should be already playing, and start that - DONE, needs testing
+# fix: time components (minute / hour) have leading zeroes omitted, causing some start times to be ignored - DONE
+# feature: when starting the main loop, try to establish if something should be already playing, and start that - DONE, conflicted with switchover so PLAYBACK was added to be set when correctly playing files, thus preventing recovery in normal operation and only when restarting the tool
 # test: absolute/relative paths in filenames
 # added uri parsing for streams, doesn't fully work for now
-# fix: time components (minute / hour) have leading zeroes omitted, causing some start times to be ignored - DONE
+# fixed: multiple startups of the same file in one minute
 
 import distutils.spawn
 import subprocess
@@ -27,14 +28,17 @@ import yaml
 from datetime import datetime, timedelta
 from time import sleep, localtime
 
-VERSION = "0.0.7"
+VERSION = "0.0.8"
 PLAYERCTL = ""
 VLC = ""
 MOPIDY = ""
 STARTUP = True
+PLAYBACK = False
 SLEEPTIME = 2
 MAXTICK = 10000
 SWITCHOVER = []
+STARTUPMINUTE = False
+MINUTEBUFFER = "00"
 
 parser = argparse.ArgumentParser(description='Dirigent - a media player orchestration tool. Reads a yaml file to understand what they need to do.')
 parser.add_argument('yamlFile')
@@ -75,6 +79,7 @@ def playMedia(args):
             setVlcLoop(False)
 
     if(mediaStream):
+        streamUri = ''
         try:
             streamUri = args['uri']
         except KeyError:
@@ -102,7 +107,7 @@ def stopMedia():
 
 def getVlcStatus():
     if(PLAYERCTL):
-        playerctlVlcCheckProcess = subprocess.run([PLAYERCTL, "-p", "vlc", "status"], capture_output=True)  #temporarily targets mopidy to aid debugging
+        playerctlVlcCheckProcess = subprocess.run([PLAYERCTL, "-p", "vlc", "status"], capture_output=True)
         playerctlVlcStdout = playerctlVlcCheckProcess.stdout.decode('UTF-8')[:-1].split(',')
         return str(playerctlVlcStdout[0])
 
@@ -116,8 +121,12 @@ def getPlaylistIndex(slotName):
 
 def playVlcFile(fileName):
     if(PLAYERCTL):
+        global PLAYBACK
+        global STARTUPMINUTE
         playerctlVlcPlayInstructions = [PLAYERCTL, "-p", "vlc", "open", fileName]
         playerctlVlcPlayProcess = subprocess.run(playerctlVlcPlayInstructions)
+        STARTUPMINUTE = True
+        PLAYBACK = True
 
 print("Dirigent v" + VERSION + " starting up ...")
 
@@ -188,11 +197,13 @@ if(STARTUP):
         print("-- Main Loop Tick --")   
         timeNow = localtime()
         currentTimeString = str(timeNow.tm_hour).rjust(2, '0') + ":" + str(timeNow.tm_min).rjust(2, '0')
+        if (str(timeNow.tm_min).rjust(2, '0') != MINUTEBUFFER):
+            STARTUPMINUTE = False
         if(len(SWITCHOVER)>0):
             vlcStatus = getVlcStatus()
             if(vlcStatus == "Stopped"):
                 print("Switchover! Starting stream!")
-                playMedia({'stream': 'mopidy'})
+                playMedia({'stream': 'mopidy', 'uri': 'https://securestreams6.autopo.st:2222/stream'})
             print("VLC Status for switchover: " + vlcStatus)
         else:
             try:
@@ -200,7 +211,9 @@ if(STARTUP):
                 startMedia = timeslots[currentTimeString]
                 slotToPlay = playlist[getPlaylistIndex(startMedia)]
                 print(str(slotToPlay[startMedia]))
-                playMedia(slotToPlay[startMedia])            
+                if(not STARTUPMINUTE):
+                    MINUTEBUFFER = str(timeNow.tm_min).rjust(2, '0')
+                    playMedia(slotToPlay[startMedia])            
             except KeyError:
                 # nothing to play so far, figure out if we need to recover and should already be playing
                 #print("DEBUG: looking for recovery timeslot")
@@ -218,7 +231,7 @@ if(STARTUP):
                         recoveryIndex = timeDifference[0]
                     else:
                         break
-                if(recoveryMode):
+                if(recoveryMode and not PLAYBACK):
                     #print("DEBUG: trying to recover at "+ str(recoveryIndex))
                     #use recoveryindex to get the start time of the concert
                     recoveryTimeString = recoveryTimes[recoveryIndex].strftime("%H:%M")
@@ -228,7 +241,7 @@ if(STARTUP):
                         startMedia = timeslots[recoveryTimeString]
                         slotToPlay = playlist[getPlaylistIndex(startMedia)]
                         print(str(slotToPlay[startMedia]))
-                        #playMedia(slotToPlay[startMedia])            
+                        playMedia(slotToPlay[startMedia])            
                     except KeyError:
                         #print("DEBUG: didn't find a recovery slot")
                         # check if the first entry in yaml is a stream without start?
