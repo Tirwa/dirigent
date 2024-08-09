@@ -7,8 +7,9 @@
 # parse yaml file - DONE
 # create routines for common start/stop/play scenarios - DONE
 # learn about time - DONE
+# we OOP now, restructure code - DONE
 # idea: every two seconds (sleep 2), check if something should be playing - DONE for now, respects SLEEPTIME and MAXTICK
-# idea: create yaml verification via flag, set a bool to just try and read the yaml file and print the media slots
+# idea: create yaml verification via flag, set a bool to just try and read the yaml file and print the media slots - DONE, flag is --dryrun
 # idea: create yaml structure (variable: loopvideo) to allow loop flag for vlc for combined video/stream playback
 # switchover: variable to be set if the player needs to be monitored
 #             if it is set, the main loop needs to continuously check that player
@@ -20,203 +21,109 @@
 # added uri parsing for streams, doesn't fully work for now
 # fixed: multiple startups of the same file in one minute
 
-import distutils.spawn
-import subprocess
+
+
+
 import argparse
 import os.path
 import yaml
 from datetime import datetime, timedelta
 from time import sleep, localtime
 
-VERSION = "0.0.8"
-PLAYERCTL = ""
-VLC = ""
-MOPIDY = ""
+from playControls import PlayControls
+from playlist import Playlist
+from messaging import Messaging
+
+VERSION = "0.1.0"
+
 STARTUP = True
-PLAYBACK = False
 SLEEPTIME = 2
 MAXTICK = 10000
-SWITCHOVER = []
-STARTUPMINUTE = False
 MINUTEBUFFER = "00"
+
+DRYRUN = False
+DEBUG = True
+
 
 parser = argparse.ArgumentParser(description='Dirigent - a media player orchestration tool. Reads a yaml file to understand what they need to do.')
 parser.add_argument('yamlFile')
+parser.add_argument('--dryrun', required=False, action='store_true', help="dryrun, just parse + verify the yaml without actually orchestrating media players")
 args = parser.parse_args()
 
-def playMedia(args):
-    global SWITCHOVER
-    mediaFile = ''
-    mediaStream = ''
-    print("Stopping Playback ...")
-    stopMedia()
-    print("Trying to play " + str(args) + " ...")
-    try:    #look for switchover
-        switchoverFlag = args['switchover']
-        if(switchoverFlag):
-            SWITCHOVER = ['vlc', True]
-        else:
-            SWITCHOVER = []
-    except KeyError:
-        SWITCHOVER = []
-    try:    #look for a file in the arguments
-        mediaFile = args['file']
-        print(mediaFile)
-    except KeyError:
-        print("No File in directions!")
-    
-    try:    # look for a stream in the arguments
-        mediaStream = args['stream'] 
-        #print(mediaStream)
-    except KeyError: 
-        print("No Stream in directions!")
-    
-    if(mediaFile):
-        playVlcFile(mediaFile)
-        try:
-            setVlcLoop(args['loopvideo'])
-        except KeyError:
-            setVlcLoop(False)
+messageController = Messaging(DEBUG)            
 
-    if(mediaStream):
-        streamUri = ''
-        try:
-            streamUri = args['uri']
-        except KeyError:
-            print("No URI found")
-        print("Calling " + mediaStream + " now ...")
-        if(streamUri):
-            if(PLAYERCTL):
-                playerctlStartProcess = subprocess.run([PLAYERCTL, "-p", mediaStream, "open", streamUri])
-        else:    
-            if(PLAYERCTL):
-                playerctlStartProcess = subprocess.run([PLAYERCTL, "-p", mediaStream, "play"])
-            
+messageController.message("Dirigent v" + VERSION + " starting up ...",0)
 
-def setVlcLoop(boolLoop):
-    if(PLAYERCTL):
-        if(boolLoop):
-            playerctlVlcLoopInstructions = [PLAYERCTL, "-p", "vlc", "loop", "Track"]
-        else:
-            playerctlVlcLoopInstructions = [PLAYERCTL, "-p", "vlc", "loop", "None"]
-        playerctlVlcLoopProcess = subprocess.run(playerctlVlcLoopInstructions)
-        
-def stopMedia():
-    if(PLAYERCTL):
-        playertctlStopProcess = subprocess.run([PLAYERCTL, "-a", "pause"])
-
-def getVlcStatus():
-    if(PLAYERCTL):
-        playerctlVlcCheckProcess = subprocess.run([PLAYERCTL, "-p", "vlc", "status"], capture_output=True)
-        playerctlVlcStdout = playerctlVlcCheckProcess.stdout.decode('UTF-8')[:-1].split(',')
-        return str(playerctlVlcStdout[0])
-
-def getPlaylistIndex(slotName):
-    for slot in enumerate(playlist):
-        try:
-            testIndex = slot[1][slotName]
-            return slot[0]
-        except KeyError:
-            pass
-
-def playVlcFile(fileName):
-    if(PLAYERCTL):
-        global PLAYBACK
-        global STARTUPMINUTE
-        playerctlVlcPlayInstructions = [PLAYERCTL, "-p", "vlc", "open", fileName]
-        playerctlVlcPlayProcess = subprocess.run(playerctlVlcPlayInstructions)
-        STARTUPMINUTE = True
-        PLAYBACK = True
-
-print("Dirigent v" + VERSION + " starting up ...")
+##detecting dryrun
+DRYRUN = args.dryrun
+messageController.message("DRYRUN: " + str(DRYRUN),0)
+if DRYRUN : MAXTICK = 0
 
 ## checking and opening yaml 
-if(STARTUP):
-    print("Checking File " + args.yamlFile + " ...")
-    if (args.yamlFile[-3:] == "yml"):
-        try:
-            yamlFile = open(args.yamlFile)
-            print("YAML File found!")
-            loadedYaml = yaml.safe_load(yamlFile)
-            #print(loadedYaml)
-            try:
-                playlist = list(loadedYaml['playlist'])
-                #print(playlist)                
-            except (AttributeError, KeyError) as e:
-                print("Error: No Playlist found in file!")
-                STARTUP = False
-        except IOError:
-            print("Error: Couldn't open the YAML file!")
-            STARTUP = False
-    else:
-        print("This does not look like a YAML file!")
-        STARTUP = False    
+playlistController = Playlist(args.yamlFile)
+if (playlistController.initializePlaylist() != 0):
+    STARTUP = False
+playControls = PlayControls(messageController)
     
 ## checking for playerctl and trying to get a list of available players
-if(STARTUP):
-    print("Looking for playerctl ...")
-    PLAYERCTL = distutils.spawn.find_executable("playerctl")
-    if (PLAYERCTL):
-        print ("playerctl found at " + PLAYERCTL)
-        print("Getting List of all available media players ...")
-        playerctlProcess = subprocess.run([PLAYERCTL, "--list-all"], capture_output=True)
-        playerctlStdout = playerctlProcess.stdout.decode('UTF-8')[:-1].split(',')
-        print(playerctlStdout)
-        if(playerctlStdout == ""):
-            pass
+if(STARTUP and not DRYRUN):
+    messageController.message("Looking for playerctl ...",2)
+    playerctlSetup = playControls.setupPlayerctl()
+    if(int(playerctlSetup)>=0):
+        messageController.message(playerctlSetup,2)
     else:
-        print ("Error: Unable to locate playerctl!")
+        messageController.message("Error: Unable to locate playerctl!",0)
         STARTUP = False
 
 ## checking for vlc
-if(STARTUP):
-    print("Looking for vlc ...")
-    VLC = distutils.spawn.find_executable("vlc")    
-    if (VLC):
-        print ("vlc found at " + VLC)    
+if(STARTUP and not DRYRUN):
+    messageController.message("Looking for vlc ...",2)
+    VLCstartup = playControls.locateVLC()
+    if (int(VLCstartup)>=0):
+        messageController.message("vlc found at " + VLCstartup,2)
     else:
-        print ("Error: Unable to locate vlc!")
+        messageController.message("Error: Unable to locate vlc!",0)
         STARTUP = False
        
 ## main loop       
 if(STARTUP):
-    #print("-- Main Loop --")
-    print("Found the following media slots ...")
+    messageController.message("-- Main Loop --",2)
+    messageController.message("Found the following media slots ...",2)
     timeslots = {}
-    for slot in playlist:
-        print(slot)
+    for slot in playlistController.getYaml():
+        messageController.message(slot,2)
         slotTitle = list(slot)[0]
         slotAttributes = list(slot.values())[0]
         try:
-            print(slotTitle + " @ " + slotAttributes['start'])
+            messageController.message(slotTitle + " @ " + slotAttributes['start'],2)
             timeslots[slotAttributes['start']] = slotTitle
         except KeyError:
             pass
     currentTick = 0
     while (currentTick < MAXTICK):
-        print("-- Main Loop Tick --")   
+        messageController.message("-- Main Loop Tick --",2)
         timeNow = localtime()
         currentTimeString = str(timeNow.tm_hour).rjust(2, '0') + ":" + str(timeNow.tm_min).rjust(2, '0')
         if (str(timeNow.tm_min).rjust(2, '0') != MINUTEBUFFER):
             STARTUPMINUTE = False
-        if(len(SWITCHOVER)>0):
-            vlcStatus = getVlcStatus()
+        if(len(playControls.SWITCHOVER)>0):
+            vlcStatus = str(playControls.getVlcStatus())
             if(vlcStatus == "Stopped"):
-                print("Switchover! Starting stream!")
-                playMedia({'stream': 'mopidy', 'uri': 'https://securestreams6.autopo.st:2222/stream'})
-            print("VLC Status for switchover: " + vlcStatus)
+                messageController.message("Switchover! Starting stream!",1)
+                playControls.playMedia({'stream': 'mopidy', 'uri': 'https://securestreams6.autopo.st:2222/stream'})
+            messageController.message("VLC Status for switchover: " + vlcStatus,1)
         else:
             try:
-                print("Trying for media ... " + "currentTimeString: " + currentTimeString)
+                messageController.message("Trying for media ... " + "currentTimeString: " + currentTimeString,2)
                 startMedia = timeslots[currentTimeString]
-                slotToPlay = playlist[getPlaylistIndex(startMedia)]
-                print(str(slotToPlay[startMedia]))
+                slotToPlay = playlistController.getYaml()[playlistController.getPlaylistIndex(startMedia)]
+                messageController.message(str(slotToPlay[startMedia]),2)
                 if(not STARTUPMINUTE):
                     MINUTEBUFFER = str(timeNow.tm_min).rjust(2, '0')
-                    playMedia(slotToPlay[startMedia])            
+                    playControls.playMedia(slotToPlay[startMedia])            
             except KeyError:
                 # nothing to play so far, figure out if we need to recover and should already be playing
-                #print("DEBUG: looking for recovery timeslot")
+                messageController.message("DEBUG: looking for recovery timeslot",2)
                 recoveryTimes = []
                 timeDifferences = []
                 for singleTimeslot in timeslots:
@@ -226,41 +133,41 @@ if(STARTUP):
                 recoveryIndex = 0
                 for timeDifference in enumerate(timeDifferences):
                     if(timeDifference[1].days < 0):
-                        #print("DEBUG: found a recovery slot")
+                        messageController.message("DEBUG: found a recovery slot",2)
                         recoveryMode = True
                         recoveryIndex = timeDifference[0]
                     else:
                         break
-                if(recoveryMode and not PLAYBACK):
-                    #print("DEBUG: trying to recover at "+ str(recoveryIndex))
+                if(recoveryMode and not playControls.PLAYBACK):
+                    messageController.message("DEBUG: trying to recover at "+ str(recoveryIndex),2)
                     #use recoveryindex to get the start time of the concert
                     recoveryTimeString = recoveryTimes[recoveryIndex].strftime("%H:%M")
                     #access timeslots as usual
                     try:
-                        print("Trying for media ... " + "Recovery timeslot: " + recoveryTimeString)
+                        messageController.message("Trying for media ... " + "Recovery timeslot: " + recoveryTimeString,2)
                         startMedia = timeslots[recoveryTimeString]
-                        slotToPlay = playlist[getPlaylistIndex(startMedia)]
-                        print(str(slotToPlay[startMedia]))
-                        playMedia(slotToPlay[startMedia])            
+                        slotToPlay = playlistController.getYaml()[playlistController.getPlaylistIndex(startMedia)]
+                        messageController.message(str(slotToPlay[startMedia]),2)
+                        playControls.playMedia(slotToPlay[startMedia])            
                     except KeyError:
                         #print("DEBUG: didn't find a recovery slot")
                         # check if the first entry in yaml is a stream without start?
                         pass
                 else:
-                    firstEntry = list(playlist[0].values())[0]
+                    firstEntry = list(playlistController.getYaml()[0].values())[0]
                     try:
                         if(firstEntry['stream'] == 'mopidy' and currentTick == 0):
-                            print("First Entry is a stream!")
+                            messageController.message("First Entry is a stream!",2)
                             try:
                                 testStartTime = firstEntry['start']
                             except KeyError:
-                                playMedia(firstEntry)
+                                playControls.playMedia(firstEntry)
                     except KeyError:
                         pass
-                    print("Nothing to start!")                        
+                    messageController.message("Nothing to start!",1)
                         
         currentTick = currentTick + 1
         sleep(SLEEPTIME)
 
 
-print("Dirigent v" + VERSION + " has shut down!")
+messageController.message("Dirigent v" + VERSION + " has shut down!",0)
